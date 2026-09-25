@@ -6,12 +6,12 @@
 import sys
 from rustypot import Xl330PyController
 
-from constants import MOTOR_TO_ID, ID_TO_MOTOR
+from constants import MOTOR_TO_ID, ID_TO_MOTOR, U2D2C_SERIAL
 
 
 def main() -> None:
     controller = Xl330PyController(
-        serial_port="/dev/ttyAMA0", baudrate=1_000_000, timeout=0.1
+        serial_port=U2D2C_SERIAL, baudrate=1_000_000, timeout=0.1
     )
 
     if len(sys.argv) > 1:

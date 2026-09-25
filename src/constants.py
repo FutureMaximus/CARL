@@ -3,6 +3,9 @@
 
 import numpy as np
 
+# Serial for U2D2C (USB to Dynamixel Controller) on the Raspberry Pi
+U2D2C_SERIAL: str = "/dev/ttyUSB0"
+
 MOTOR_TO_ID = {
     "left_hip_yaw": 11,
     "left_hip_roll": 12,
