@@ -114,10 +114,12 @@ VY_MAX: float = 0.3
 VTHETA_MAX_STATIONARY: float = 3.0
 VTHETA_MAX_MOVING: float = 1.5
 
-# IMU (BMI088) I2C bus number on the Raspberry Pi
+# Adafruit BNO085/BNO080 (product 4754), on the Raspberry Pi I2C bus.
 IMU_I2C_BUS: int = 1
+IMU_I2C_ADDRESS: int = 0x4A  # Use 0x4B when the breakout DI pin is pulled high.
 
 # Rotation from trunk frame (body) to IMU sensor frame
+# Mount the BNO085 with the same sensor axes, or update this quaternion.
 IMU_MOUNT_QUAT: tuple[float, float, float, float] = (0.5, -0.5, -0.5, 0.5)
 
 # Observation DoF ordering

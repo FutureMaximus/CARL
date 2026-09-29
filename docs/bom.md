@@ -4,9 +4,9 @@ Here is a detailed Bill of Materials (BOM) for the project, including links to p
 
 Unlike the other components, the **[RPI Robot Hat](https://github.com/pollen-robotics/elec_RPI_Robot_HAT)** is not an off-the-shelf part: it is an open-source board that you need to have manufactured. Its design files are freely available on GitHub and can be ordered from any PCB fabrication service (e.g. JLCPCB, PCBWay, Aisler). The listed price is a rough estimate and will depend on the fab you choose and the quantity ordered. 
 
-At the time of writing, **a Microban robot costs approximately $567**.
+At the time of writing, **a Microban robot costs approximately $597**, including the BNO085 breakout.
 
-If you also include the configuration tools (Dynamixel U2D2 and U2D2 Power Hub), the total cost rises to approximately $623.
+If you also include the configuration tools (Dynamixel U2D2 and U2D2 Power Hub), the total cost rises to approximately $653.
 
 > [!WARNING]
 > **Note regarding PCB Ordering with JLCPCB**
@@ -20,6 +20,7 @@ To build a complete Microban robot, you will need the following components:
 
 | Component | Image | Quantity | Price | Link | Description / Notes |
 | :--- | :---: | :---: | :--- | :--- | :--- |
+| BNO085 / BNO080 IMU | — | 1 | ~$29.50 | [Adafruit 4754](https://www.adafruit.com/product/4754) | External I2C IMU replacing the HAT's BMI088 in software; see [wiring and mounting](imu.md). |
 | Battery Holder | <img width="495" height="370" alt="image" src="https://github.com/user-attachments/assets/c34fd978-c4ad-4e65-9ab5-c66cf8f0093d" /> | 1 | ~$5.00 | [Amazon](https://www.amazon.fr/gp/product/B08YDTSML8/ref=sw_img_1?smid=A9DEKVHK1XMRT&th=1) | 2x18650 Battery Holder. |
 | BMS | <img width="578" height="334" alt="image" src="https://github.com/user-attachments/assets/6e34f026-2986-484f-9baa-1df57be5c0dd" /> | 1 | ~$10.00 | [Amazon](https://www.amazon.fr/gp/product/B0GJLGG7MM/ref=ewc_pr_img_1?smid=A263J3XHEW00G8&psc=1) | Battery Management System for 2x18650 batteries. |
 | Switch | <img width="227" height="165" alt="image" src="https://github.com/user-attachments/assets/269e7adf-49be-4885-bb97-f27f1dc2e84b" /> | 1 | ~$5.00 | [Amazon](https://www.amazon.fr/gp/product/B0F32NVDHW/ref=ewc_pr_img_1?smid=A3PA4HG72LIUMJ&psc=1) | Power switch for the robot. |

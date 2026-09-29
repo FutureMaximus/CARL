@@ -1,21 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright 2026 Marc Duclusaud
 
+import math
 import threading
 import time
 from dataclasses import dataclass
 import numpy as np
 
-from ahrs.common.orientation import acc2q
-from bmi088 import BMI088
-import bmi088.bmi088 as _bmi_module
-from constants import IMU_MOUNT_QUAT
-
-
-# Python defaults: ACC=0x18, GYRO=0x69
-# Our board according to the rust driver: ACC=0x19, GYRO=0x68
-_bmi_module.ACC_ADDRESS = 0x19
-_bmi_module.GYRO_ADDRESS = 0x68
+from constants import IMU_I2C_ADDRESS, IMU_MOUNT_QUAT
 
 
 @dataclass(frozen=True)
@@ -60,14 +52,39 @@ def quat_apply_inverse(quat: list[float], vec: list[float]) -> list[float]:
     return vec - w * t + np.cross(xyz, t)
 
 class ThreadedIMUReader:
-    """Reads BMI088 on a dedicated thread and exposes the latest sample snapshot."""
+    """Read BNO085/BNO080 fusion: wxyz quaternion, rad/s gyro and acceleration in g."""
 
-    def __init__(self, i2c_bus: int, frequency_hz: float = 200.0, warn_interval_s: float = 1.0) -> None:
-        if frequency_hz <= 0:
-            raise ValueError("frequency_hz must be > 0")
+    def __init__(self, i2c_bus: int, frequency_hz: float = 200.0, warn_interval_s: float = 1.0,
+                 address: int = IMU_I2C_ADDRESS) -> None:
+        if not math.isfinite(frequency_hz) or frequency_hz <= 0:
+            raise ValueError("frequency_hz must be finite and > 0")
 
-        self._imu = BMI088(i2c_bus=i2c_bus)
         self._period_s = 1.0 / frequency_hz
+        report_interval_us = round(self._period_s * 1_000_000)
+        if not 1 <= report_interval_us <= 0xFFFFFFFF:
+            raise ValueError("frequency_hz is outside the BNO08x report interval range")
+
+        # Keep hardware-only imports out of simulation and orientation helpers.
+        from adafruit_extended_bus import ExtendedI2C
+        from adafruit_bno08x import (
+            BNO_REPORT_ACCELEROMETER,
+            BNO_REPORT_GYROSCOPE,
+            BNO_REPORT_GAME_ROTATION_VECTOR,
+        )
+        from adafruit_bno08x.i2c import BNO08X_I2C
+
+        self._i2c = ExtendedI2C(i2c_bus)
+        try:
+            self._imu = BNO08X_I2C(self._i2c, address=address)
+            # Game fusion uses gravity and gyro, avoiding motor-induced magnetic
+            # heading corrections. Yaw may drift, as with the previous 6-axis IMU.
+            for feature in (BNO_REPORT_ACCELEROMETER, BNO_REPORT_GYROSCOPE,
+                            BNO_REPORT_GAME_ROTATION_VECTOR):
+                self._imu.enable_feature(feature, report_interval=report_interval_us)
+        except Exception:
+            self._i2c.deinit()
+            raise
+        self._closed = False
         self._warn_interval_s = warn_interval_s
 
         self._lock = threading.Lock()
@@ -88,6 +105,8 @@ class ThreadedIMUReader:
         self._last_warn_s = 0.0
 
     def start(self) -> None:
+        if self._stop_event.is_set():
+            raise RuntimeError("A stopped IMU reader cannot be restarted")
         if not self._thread.is_alive():
             self._thread.start()
 
@@ -95,6 +114,9 @@ class ThreadedIMUReader:
         self._stop_event.set()
         if self._thread.is_alive():
             self._thread.join(timeout=timeout_s)
+        if not self._thread.is_alive() and not self._closed:
+            self._i2c.deinit()
+            self._closed = True
 
     def get_latest(self) -> IMUSnapshot:
         with self._lock:
@@ -110,45 +132,27 @@ class ThreadedIMUReader:
             "target_frequency_hz": 1.0 / self._period_s,
         }
 
-    def _bootstrap_orientation(self, n_samples: int = 50) -> None:
-        """Warm-start the Madgwick filter from a brief static accelerometer average.
-
-        Reads *n_samples* at the normal loop rate, averages them, and uses
-        acc2q to compute an initial quaternion (roll/pitch from gravity,yaw=0).
-        """
-        acc_sum = np.zeros(3)
-        count = 0
-        for _ in range(n_samples):
-            try:
-                ax, ay, az = self._imu.read_accelerometer()
-                acc_sum += np.array([float(ax), float(ay), float(az)])
-                count += 1
-            except Exception:
-                pass
-            time.sleep(self._period_s)
-        if count > 0:
-            self._imu.q = list(acc2q(acc_sum / count))
-
     def _run_loop(self) -> None:
-        self._bootstrap_orientation()
         next_tick = time.perf_counter()
-        last_tick = next_tick
 
         while not self._stop_event.is_set():
             now = time.perf_counter()
-            dt = max(1e-4, now - last_tick)
-            last_tick = now
-
             try:
-                w, x, y, z = self._imu.get_quat(dt)
-                gx, gy, gz = self._imu.read_gyroscope()
-                ax, ay, az = self._imu.read_accelerometer()
+                # Adafruit reports xyzw and m/s^2; callers expect wxyz and g.
+                x, y, z, w = self._imu.game_quaternion
+                gx, gy, gz = self._imu.gyro
+                ax, ay, az = self._imu.acceleration
+                if not all(math.isfinite(v) for v in (w, x, y, z, gx, gy, gz, ax, ay, az)):
+                    raise ValueError("Non-finite IMU sample")
+                norm = math.sqrt(w*w + x*x + y*y + z*z)
+                if norm < 1e-6:
+                    raise ValueError("Invalid IMU quaternion")
                 with self._lock:
                     self._snapshot = IMUSnapshot(
                         timestamp_s=now,
-                        quat=(float(w), float(x), float(y), float(z)),
+                        quat=(w / norm, x / norm, y / norm, z / norm),
                         gyro=(float(gx), float(gy), float(gz)),
-                        acc=(float(ax), float(ay), float(az)),
+                        acc=(ax / 9.80665, ay / 9.80665, az / 9.80665),
                         valid=True,
                         error_count=self._error_count,
                     )
@@ -164,14 +168,14 @@ class ThreadedIMUReader:
                         quat=prev.quat,
                         gyro=prev.gyro,
                         acc=prev.acc,
-                        valid=prev.valid,
+                        valid=False,
                         error_count=self._error_count,
                     )
 
             next_tick += self._period_s
             sleep_s = next_tick - time.perf_counter()
             if sleep_s > 0:
-                time.sleep(sleep_s)
+                self._stop_event.wait(sleep_s)
             else:
                 # Reset cadence anchor when late to avoid accumulating drift.
                 next_tick = time.perf_counter()

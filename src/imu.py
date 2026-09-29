@@ -17,7 +17,7 @@ from imu_reader import ThreadedIMUReader, imu_quat_to_body, quat_apply_inverse
 reader = ThreadedIMUReader(i2c_bus=IMU_I2C_BUS, frequency_hz=200.0)
 reader.start()
 
-print("IMU (BMI088) — Ctrl-C to stop.")
+print("IMU (BNO085/BNO080) — Ctrl-C to stop.")
 
 try:
     while True:

@@ -24,7 +24,7 @@ by default; add `HOST=microban-ext` to operate over the secondary network (see t
 | `make shutdown` | Power off the Pi cleanly. |
 | `make setup` | Sync the code and (re)install dependencies on the robot (`uv sync --frozen`). Run after changing dependencies. |
 | `make sync` | Sync your local copy to the robot without touching dependencies. |
-| `make imu` | Stream the robot's IMU/gyro readings to your terminal. |
+| `make imu` | Stream the robot's BNO085/BNO080 IMU/gyro readings to your terminal (see [wiring and setup](imu.md)). |
 | `make voltage` | Read the voltage of all motors. |
 | `make voltage ID=<id>` | Read the voltage of motor `<id>`. |
 | `make sim` | Run the MuJoCo simulation locally (no robot needed). |
